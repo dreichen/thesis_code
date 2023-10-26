@@ -101,7 +101,7 @@
                 )
 	)
 
-    (:durative-action forwardOrderA
+    (:durative-action forwardOrder
         :parameters
             (?o - Order)
 
@@ -120,7 +120,7 @@
                 )
 	)
 
-    (:durative-action uploadOrderConfirmationA
+    (:durative-action uploadOrderConfirmation
         :parameters
             (?o - Order)
 
@@ -139,29 +139,7 @@
 	            (at end (poNumberProvided ?o uploadOrderConfirmation))
 	            (at end (amountProvided ?o uploadOrderConfirmation))
 	            (at end (quantityProvided ?o uploadOrderConfirmation))
+	            (at end (reachedFinalStep))
                 )
 	)
-        
-
-    (:durative-action cancelOrder
-        :parameters
-            (?o - Order)
-
-        :duration
-            (= ?duration 1)
-
-        :condition
-	        (and
-	            (at start (not (canceled)))
-	        )
-
-        :effect
-	        (and
-	            (at end (supplierPoNumberProvided ?o addOrderDocument))
-	            (at start (canceled))
-	            (at end (reachedFinalStep))
-	        )
-	)
-
-    
 )

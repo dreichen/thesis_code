@@ -10,6 +10,7 @@
 (:goal (and
     (not canceled)
     (orderFilled order fillOrder)
+    (reachedFinalStep)
 ))
 
 ;un-comment the following line if metric is needed

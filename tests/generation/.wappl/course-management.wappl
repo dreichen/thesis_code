@@ -1,0 +1,163 @@
+type Url string = {
+    validator: "^((http|https)://)[-a-zA-Z0-9@:%._\\+~#?&//=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%._\\+~#?&//=]*)$"
+}
+
+type Grade decimal = {
+  fixed(2, 2)
+  positive
+}
+
+type StudentNumber string = {
+  validator: "^[0-9]*$"
+  maxLength: 16
+  minLength: 16
+}
+
+entity Module = {
+    num : integer
+    title : Text
+    elements -> ModuleElement*
+    date : Date
+}
+
+entity ModuleElement = {
+    title : Text
+    additionalInfoUrls : Url*
+    description : Text?
+    homework -> Homework?
+    exam -> Exam?
+}
+
+entity Exam = {
+  num : integer
+  assignments -> Assignment*
+  start : DateTime
+  deadline : DateTime
+}
+
+entity Homework = {
+  num : integer
+  title : Text
+  assignments -> Assignment*
+  start : DateTime
+  deadline : DateTime
+}
+
+entity Assignment = {
+  num : integer
+  title : Text
+  question : Text
+  needsBnf : boolean
+}
+
+entity Group = {
+  name       : Text
+  members -> Student*
+}
+
+entity GroupInvitation = {
+  group -> Group
+  recipients -> Student*
+  mail : EMailAddress
+}
+
+role Student = {
+  permissions: {
+    SubmitHomework
+  }
+}
+
+role TeachingAssistant = {
+  permissions: {
+    GradeHomework
+  }
+}
+
+task HomeworkSubmissionTask(hw -> Homework, group -> Group) = {
+  permissions: {
+    SubmitHomework
+  }
+
+  step submitTextAnswer(assignment -> Assignment) = {
+    precondition: {
+        hw.deadline >= DateTime.now()
+        hw.start <= DateTime.now()
+    }
+
+    fields: {
+      answer : Text
+    }
+  }
+
+  step attachCodeFile(assignment -> Assignment) = {
+    precondition: {
+      assignment.needsBnf == true
+      hw.deadline >= DateTime.now()
+      hw.start <= DateTime.now()
+    }
+
+    fields: {
+      attachedFile : File
+    }
+  }
+
+  final step deadlineReached(assignment -> Assignment) = {
+    precondition: {
+      hw.deadline < DateTime.now()
+    }
+
+    computed: {
+      deadlineOver = true
+    }
+  }
+}
+
+task ModuleElementCompleting(element -> ModuleElement) = {
+  step checkModuleElement() = {
+    computed: {
+      done = true
+    }
+  }
+  step uncheckModuleElement() = {
+    computed: {
+      done = false
+    }
+  }
+  final step classOver() = {
+    computed: {
+      done = true
+    }
+  }
+}
+
+task HomeworkGrading(hw -> Homework) = {
+  permissions: {
+    GradeHomework
+  }
+
+  step claimAssignment(assignment -> Assignment) = {
+    precondition: {
+      HomeworkGrading(hw).find(assignment, claimed, false) == true 
+    }
+
+    computed: {
+      claimed = true
+    }
+  }
+
+  step gradeAssignment(assignment -> Assignment) = {
+    precondition: {
+      claimed
+    }
+
+    fields: {
+      grade    : Grade
+    }
+  }
+
+  final step gradeHomework() = {
+      computed: {
+        totalGrade = sum(HomeworkGrading(hw).find(*).grade)
+      }
+  }
+}

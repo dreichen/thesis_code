@@ -1,0 +1,78 @@
+from example_data_layers.fixed_price_request import *
+
+requester = RequesterEntity({})
+buyer = BuyerEntity({})
+buyer2 = BuyerEntity({})
+supplier = SupplierEntity()
+supplier.mail = "tu@bar.de"
+supplier.name = "TU Darmstadt"
+supplier2 = SupplierEntity()
+supplier2.mail = "r2@bar.de"
+supplier2.name = "r2 Software"
+supplier3 = SupplierEntity()
+supplier3.mail = "decline@supplier.de"
+supplier3.name = "declining supplier"
+
+request = FixedPriceRequestEntity({
+    "information": "",
+    "requester": requester,
+    "deadline": "01.08.2023 14:14:12", # make sure deadline is already reached so that voting can be over
+})
+
+task = FixedPriceRequestTaskTask(request)
+task.step_init({
+})
+
+task.step_edit({
+    "requestFile": File('fixed_price_request_execution.txt')
+})
+
+task.step_submitToBuyer({})
+
+task.step_modifyByBuyer({
+    "legalDocument": File('fixed_price_request_execution.txt'),
+    "financialApproval": True,
+})
+
+task.step_approve({})
+
+
+task.step_submitResponse({
+    "supplierResponses": [
+        SupplierResponseEntity({
+            "supplier": supplier2,
+            "bidAmount": 12312312.0
+        })
+    ]
+})
+
+task.step_submitResponse({
+    "supplierResponses": [
+        SupplierResponseEntity({
+            "supplier": supplier,
+            "bidAmount": 4534.0
+        })
+    ]
+})
+
+task.step_submitResponse({
+    "supplierResponses": [
+        SupplierResponseEntity({
+            "supplier": supplier2,
+            "bidAmount": 9999.0
+        })
+    ]
+})
+
+task.step_submitResponse({
+    "supplierResponses": [
+        SupplierResponseEntity({
+            "supplier": supplier3,
+            "declined": True
+        })
+    ]
+})
+
+task.step_evaluateWinner({})
+
+assert task.final == True

@@ -1,0 +1,32 @@
+type Test integer = {
+}
+
+type Dollar string = {
+}
+
+type Grade decimal = {
+}
+
+entity Dummy = {
+  name : Text
+  age : integer
+  test : Test
+  grade : Grade
+  money : Dollar
+}
+
+task Test(d -> Dummy) = {
+  final step unreachable(db -> Dummy) = {
+    precondition: {
+      d.name == 'anystringcontent'
+      'moin' == d.name
+      db.name == d.name
+      5 <= d.age && 5 >= db.age
+      4 + (1 <= 6) && 4 != 6
+    }
+
+    fields: {
+      newval  : integer
+    }
+  }
+}

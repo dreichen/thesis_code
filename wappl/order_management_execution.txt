@@ -1,0 +1,155 @@
+from example_data_layers.order_management import *
+
+config = ConfigurationEntity({
+    "mailSubjectTemplate" : "Dear <first_name>",
+    "mailContentTemplate" : "This is the content template",
+    "orderConfirmationDeadlineDefaultDays" : 5,
+    "orderFullfillmentDeadlineDefaultDays" : 10,
+    "paymentGoalDays" : 10,
+    "defaultProvisionSupplier" : 1.5,
+    "defaultProvisionClerk": 1.8,
+    "defaultDiscount": 10.0,
+    "defaultSkonto": 5.0,
+    "defaultSkontoDeadlineDays": 5,
+    "mailServerAddress": "127.0.0.1",
+    "mailServerPort": 1337,
+    "mailServerUseSSL": True,
+    "mailServerSendingAddress": "foo@bar.com",
+})
+
+company = CompanyEntity({
+    "name" : "r2 Software",
+    "address" : "Street 10, 123456 Zipcode, Germany",
+    "knownSince" : "01.01.1970",
+    "description" : "Some interesting text",
+})
+
+brandCompany = CompanyEntity({
+    "name" : "TU Darmstadt",
+    "address" : "Karolinenplatz 64289 Darmstadt Germany",
+    "knownSince" : "14.12.2022",
+    "description" : "the brand in this example",
+})
+
+contact = ContactEntity({
+    "company": company,
+    "title" :"Herr",
+    "firstName": "David",
+    "lastName": "Reichenbach",
+    "mail": "david@reichenbachs.de"
+})
+
+dummyClerk = AccountingClerkEntity()
+
+order = OrderEntity({
+    "clerk": dummyClerk,
+    "customer": company,
+    "contact": contact,
+    "brand": brandCompany,
+    "type": "PO23",
+    "year": 2023,
+    "season": "Pre",
+    "quantity": 5,
+    "amount": 500,
+    "poNumber": 1,
+    "orderOrigin": "mail",
+    "orderDate": "20.07.2023",
+    "deliveryDate": "20.08.2023",
+    "discount": 5.0,
+    "provision": 0.12,
+    "skonto": 5.0,
+    "applySkonto": False,
+    "skontoDeadline": "27.08.2023",
+    "provisionClerk": 0.05
+})
+
+orderTask = OrderManagementTask(order)
+
+orderTask.step_addOrderDocument({
+    "orderDocument": File("order_management_execution.txt"),
+    "supplierPoNumber": 5
+})
+
+orderTask.step_addOrderDocument({
+    "orderDocument": File("order_management_execution.txt"),
+    "supplierPoNumber": 6
+})
+
+print("ComputedProperty expectedProvision is (before updating 'amount'):", orderTask.get("expectedProvision"))
+order.update_attribute("amount", 400.0) # updating amount of order
+print("ComputedProperty expectedProvision is (after updating 'amount'):", orderTask.get("expectedProvision"))
+print("new expectedProvision equals 48.00 now:", orderTask.get("expectedProvision") == 48.00)
+
+orderTask.step_fillOrder({
+})
+
+print("ComputedProperty filled is:", orderTask.get("filled"))
+
+orderTask.step_forwardOrder({ # step that could be executed automatically whenever preconditions are met
+})
+
+
+orderTask.step_uploadOrderConfirmation({
+    "orderConfirmation" : File("order_management_execution.txt"),
+    "poNumber" : 1,
+    "quantity" : 5,
+    "amount" : 400.0
+})
+
+orderTask.step_acceptOrderConfirmation({})
+
+orderTask.step_uploadInvoice({
+    "invoice" : File("order_management_execution.txt"),
+    "invoiceNo" : 5,
+    "invoiceQuantity" : 14,
+    "invoiceAmount" : 123.0,
+})
+
+try:
+    print("trying to confirmInvoices, assuming it fails since preconditions are not met...")
+    orderTask.step_confirmInvoices({})
+except PreconditionNotMetException as e:
+    print("PreconditionNotMetException thrown, as expected")
+
+orderTask.step_uploadInvoice({
+    "invoice" : File("order_management_execution.txt"),
+    "invoiceNo" : 5,
+    "invoiceQuantity" : 5,
+    "invoiceAmount" : 400.0,
+})
+
+orderTask.step_confirmInvoices({})
+
+orderTask.step_payProvision({
+    "provisionDocument" : File("order_management_execution.txt"),
+    "provisionComment" : "everything was as expected",
+    "provisionAmount" : 20.0,
+})
+
+orderTask.step_completeOrder({
+})
+
+try:
+    print("assuming exception is thrown since task was locked due to final step reached")
+    orderTask.step_addOrderDocument({
+        "orderDocument": File("order_management_execution.txt"),
+        "supplierPoNumber": 6
+    })
+except TaskIsLockedException as e:
+    print("TaskIsLockedException thrown as expected")
+
+# manually unlocking Task
+orderTask.final = False
+orderTask.final_steps = []
+
+# can execute steps again
+
+orderTask.step_addOrderDocument({
+    "orderDocument": File("order_management_execution.txt"),
+    "supplierPoNumber": 6
+})
+
+# and finally lock Task by cancelling it
+orderTask.step_cancelOrder({
+    "canceled": True
+})

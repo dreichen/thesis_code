@@ -1,0 +1,35 @@
+from example_data_layers.perioperative_care import *
+import time
+
+chantal = NurseEntity({"name": "Chantal"})
+nurse = NurseEntity({"name": "Nurse X"})
+patient = PatientEntity({"name": "David"})
+patient2 = PatientEntity({"name": "Christoph"})
+surgeon = SurgeonEntity({"name": "Krishna"})
+ct = CTScanningDeviceEntity({"identifier": "CT001"})
+task = PerioperativeProcessTask(patient)
+task.step_admitAtWardStart(chantal, {})
+
+try:
+    task.step_admitAtWardEnd(chantal, {}) # will fail because precondition is not met -> previous step takes 1 second that first has to pass
+except PreconditionNotMetException:
+    pass # do nothing if exception thrown as expected
+
+time.sleep(1) # amount of time the admitAtWard step takes
+task.step_admitAtWardEnd(chantal, {})
+task.step_doDiagnosticTestsStart(chantal, ct, {})
+
+time.sleep(1) # doDiagnosticTests again takes 1 second to complete
+
+task.step_doDiagnosticTestsEnd(chantal, ct, {})
+task.step_registerProcedure(chantal, {})
+
+task.step_startSurgery(surgeon, chantal, nurse, {})
+time.sleep(2) # surgery takes 2 seconds (testwise)
+task.step_endSurgery(surgeon, chantal, nurse, {})
+
+assert task.final
+
+# second task can be created and even perform using resource chantal since she is free
+task2 = PerioperativeProcessTask(patient2)
+task2.step_admitAtWardStart(chantal, {})

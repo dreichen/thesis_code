@@ -1,0 +1,229 @@
+type PhoneNumber string = {
+    validator: "^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$"
+}
+
+type Year integer = {
+    maxValue: 2030
+    minValue: 2017
+}
+
+type Money decimal = {
+    fixed(20, 2)
+    positive
+}
+
+entity Configuration = {
+    mailSubjectTemplate : Text
+    mailContentTemplate : Text
+    mailCC : EMailAddress*
+    orderConfirmationDeadlineDefaultDays : integer
+    orderFullfillmentDeadlineDefaultDays : integer 
+    paymentGoalDays : integer
+    defaultProvisionSupplier : decimal
+    defaultProvisionClerk : decimal
+    defaultDiscount : decimal
+    defaultSkonto : decimal
+    defaultSkontoDeadlineDays : integer
+    autoCompleteCategories : Text*
+    mailServerAddress : string
+    mailServerPort : integer
+    mailServerUseSSL : boolean
+    mailServerSendingAddress : EMailAddress
+    mailServerLogin : Text?
+    mailServerPassword : Text?
+}
+
+entity Company = {
+    name : Text
+    address : Address
+    knownSince : Date
+    description : Text
+    clerks -> AccountingClerk*
+    isSupplier : boolean?
+    isCustomer : boolean?
+}
+
+entity Contact = {
+    company -> Company
+    title : Text
+    firstName : Text
+    lastName : Text
+    mail : EMailAddress
+    phone : PhoneNumber?
+    phoneMobile : PhoneNumber?
+    fax : PhoneNumber?
+    address : Address?
+    department : Text?
+    birthday : Date?
+    lastVisit : Date?
+}
+
+entity Order = {
+    clerk -> AccountingClerk
+    provisionClerk : decimal?
+    customer -> Company
+    contact -> Contact?
+    brand -> Company
+    deadline : Date?
+    paymentGoal : Date?
+    category : Text*
+    block : boolean?
+    type : Text // would be enum
+    year : Year
+    season : Text // would be enum
+    poNumber : integer?
+    quantity : integer
+    amount : Money
+    orderOrigin : Text // would be enum
+    orderDate : Date
+    deliveryDate : Date
+    discount : decimal
+    specialConditions : Text?
+    provision : decimal
+    skonto : decimal
+    applySkonto : boolean
+    skontoDeadline : Date?
+}
+
+role AccountingClerk = {
+    permissions: {
+        ManageOrder
+    }
+}
+
+role Configurator = {
+    permissions: {
+        EditConfig
+    }
+}
+
+task OrderManagement(order -> Order) = {
+    permissions: {
+        ManageOrder
+    }
+
+    step addOrderDocument() = {
+        precondition: {
+            self.canceled == false
+        }
+
+        fields: {
+            orderDocument : File
+            supplierPoNumber : integer
+        }
+
+        computed: {
+            expectedPayment = order.amount
+            expectedProvision = order.provision * order.amount
+        }
+    }
+
+    step fillOrder() = {
+        precondition: {
+            self.orderDocument && self.supplierPoNumber
+            self.canceled == false
+        }
+
+        computed: {
+            filled = true
+        }
+    }
+
+    step forwardOrder() = {
+        precondition: {
+            self.filled
+            self.canceled == false
+        }
+
+        computed: {
+            orderForwarded = true
+        }
+
+        effects: {
+            mail(to=order.contact.mail, body='Sehr geehrte Damen und Herren, hiermit leite ich ihnen die Bestellung weiter.')
+        }
+    }
+
+    step uploadOrderConfirmation() = {
+        precondition: {
+            self.filled
+            self.canceled == false
+        }
+
+        fields: {
+            orderConfirmation : File
+            poNumber : integer
+            quantity : integer
+            amount : Money
+        }
+    }
+
+    step acceptOrderConfirmation() = {
+        precondition: {
+            self.poNumber == order.poNumber
+            self.quantity == order.quantity
+            self.amount == order.amount
+            self.canceled == false
+        }
+
+        computed: {
+            acceptedOrderConfirmation = true
+        }
+    }
+
+    step uploadInvoice() = {
+        precondition: {
+            self.acceptedOrderConfirmation
+            self.canceled == false
+        }
+
+        fields: {
+            invoice : File
+            invoiceNo : integer
+            invoiceQuantity : integer
+            invoiceAmount : Money
+        }
+    }
+
+    step confirmInvoices() = {
+        precondition: {
+            self.invoiceQuantity == order.quantity
+            self.invoiceAmount == order.amount
+            self.invoice
+            self.canceled == false
+        }
+
+        computed: {
+            invoicesAccepted = true
+        }
+    }
+
+    step payProvision() = {
+        precondition: {
+            self.invoicesAccepted
+            self.canceled == false
+        }
+
+        fields: {
+            provisionDocument : File?
+            provisionComment : Text
+            provisionAmount : Money
+        }
+        computed: {
+            clerkProvisionAmount = order.amount * order.provisionClerk
+        }
+    }
+
+    final step completeOrder() = {
+         precondition: {
+            self.provisionAmount == self.clerkProvisionAmount
+            self.canceled == false
+        }
+    }
+
+    final step cancelOrder() = {
+        fields: {
+            canceled : boolean
+        }
+    }
+}

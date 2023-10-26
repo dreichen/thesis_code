@@ -1,0 +1,74 @@
+type Grade decimal = {
+    fixed(2, 2)
+    positive
+}
+
+type Test integer = {
+  positive
+}
+
+entity Assignment = {
+    title : Address
+    grade : Grade?
+}
+
+entity Homework = {
+    text : Text
+    grade : Grade
+    assignments -> Assignment*
+}
+
+entity Foo = {
+    number : integer
+    text   : Text
+}
+
+role Student = { /* subroles inherited implicitly to avoid repetitions */
+  permissions: { /* base permissions that every student always have (permissions bound to some conditions are implemented using subroles) */
+    SolveQuiz
+    ReadCoursePlan
+    CompleteModule
+  }
+}
+
+/* Tasks and steps not working yet...*/
+task HomeworkSubmissionTask(hw -> Homework) = {
+  permissions: {
+    SubmitHomework
+  }
+
+  final step submitAnswer(assignment -> Assignment) = {
+    precondition: {
+      hw.text == 'random_Text'
+      4 + (1 <= 6) && 4 != 6
+    }
+
+    fields: {
+      answer        : Text
+    }
+  }
+
+  final step submitAttachedFile(assignment -> Assignment) = {
+      fields: {
+        attachedFile  : Text
+      }
+  }
+}
+
+task HomeworkGrading(hw -> Homework) = {
+  permissions: {
+    GradeHomework
+  }
+
+  step gradeAssignment(assignment -> Assignment) = {
+    fields: {
+      grade    : Grade
+    }
+  }
+
+  final step gradeHomework() = {
+      computed: {
+        totalGrade = sum(hw.assignments, grade)
+      }
+  }
+}

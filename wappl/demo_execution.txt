@@ -1,0 +1,60 @@
+from example_data_layers.demo_data_layer import *
+
+krishna = SupervisorEntity({
+    "name": "Krishna"
+})
+
+david = StudentEntity({
+    "name" : "David",
+    "mail" : "david.reichenbach@stud.tu-darmstadt.de"
+})
+
+thesis = ThesisEntity({
+    "title": "Development of ...",
+    "student": david,
+    "thesisType" : 42,
+})
+
+thesis = ThesisEntity({
+    "title": "Development of ...",
+    "student": david,
+    "thesisType" : "master",
+})
+
+submissionTaskInstance = ThesisSubmissionTask(thesis)
+
+submissionTaskInstance.step_registration({}, user=david)
+
+print("Computed Property submissionDate: ", submissionTaskInstance.get('submissionDate'))
+
+submissionTaskInstance.step_givePresentation({
+    "slideShow": File("MT_presentation.pdf")
+}, user=david)
+
+submissionTaskInstance.step_admitRegistration({}, user=krishna)
+
+submissionTaskInstance.step_givePresentation({
+    "slideShow": File("MT_presentation.pdf")
+}, user=david)
+
+submissionTaskInstance.step_submitThesis({
+    "document": File("Masterthesis_David_Reichenbach_FINAL.pdf")
+}, user=david)
+
+submissionTaskInstance.step_gradeThesis({
+    "grade": 4.0
+}, user=krishna)
+
+submissionTaskInstance.step_gradeThesis({
+    "grade": 1.0
+}, user=krishna)
+
+submissionTaskInstance.final = False
+
+submissionTaskInstance.step_gradeThesis({
+    "grade": 1.0
+}, user=krishna)
+
+print(f"Thesis graded with: {submissionTaskInstance.get('grade'):.2f}")
+
+

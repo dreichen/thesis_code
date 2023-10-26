@@ -1,0 +1,49 @@
+Type:
+    'type' name=ID parent_type='string' '= {'
+        properties*=StringProperty
+    '}' 
+    |
+    'type' name=ID parent_type='decimal' '= {'
+        properties*=DecimalProperty
+    '}' 
+    |
+    'type' name=ID parent_type='integer' '= {'
+        properties*=NumericProperty
+    '}' 
+;
+
+TypeProperty:
+    DecimalProperty* | NumericProperty* | StringProperty*
+;
+
+BuiltinTypeReference:
+    name=ID ':' type=BuiltinType (zeroOrMore?='*' | oneOrMore?='+' | nullable?='?')?
+;
+
+TypeReference:
+    name=ID ':' type=[Type] (zeroOrMore?='*' | oneOrMore?='+' | nullable?='?')?
+;
+
+BuiltinType:
+    PrimitiveType | NonprimitiveType | 'boolean'
+;
+
+NonprimitiveType:
+    'Date' | 'Text' | 'Address' | 'EMailAddress' | 'File' | 'DateTime'
+;
+
+PrimitiveType:
+    'integer' | 'string' | 'decimal'
+;
+
+DecimalProperty:
+    'fixed(' fixed=INT ',' fixed=INT ')' | 'float(' float=INT ',' float=INT ')' | positive?='positive' | negative?='negative' | 'maxValue:' maxValue=INT | 'minValue:' minValue=INT
+;
+
+NumericProperty:
+    positive?='positive' | negative?='negative' | 'maxValue:' maxValue=INT | 'minValue:' minValue=INT
+;
+
+StringProperty:
+    'maxLength:' maxLength=INT | 'minLength:' minLength=INT | 'validator:' validator=STRING
+;

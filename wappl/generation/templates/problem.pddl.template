@@ -1,0 +1,53 @@
+(define (problem {{ domain_name }}problem) (:domain {{ domain_name }}_gen)
+(:objects 
+    {% for task in tasks %}
+    ; Task: {{ task.name }}
+    {{ task.name }}Instance - {{ task.name }}
+    {%- for argument in task.arguments %}
+    {{ argument.name }} - {{ argument.entity.name }}
+    {%- endfor %}
+    {% for step in task.steps %}
+        ; step: {{ step.name }}
+        {%- for argument in step.arguments %}
+        {{ argument.name }} - {{ argument.entity.name }}
+        {%- endfor %}
+        {%- for field in step.fields %}
+        {{ field.name }} - {{ field.type }}
+        {%- endfor %}       
+    {% endfor %}
+    {% endfor %}
+)
+
+(:init
+    {%- for task in tasks %}
+    {%- for step in task.steps %}
+    (stepOf {{ task.name }}Instance {{ step.name }})
+    {%- for field in step.fields %}
+    (fieldOf {{ step.name }} {{ field.name }})
+    {% endfor %}
+    {%- for argument in step.arguments %}
+    (entityArgOf {{ step.name }} {{ argument.name }})   
+    {%- endfor %}
+    {%- for predicate in step.pddl_predicates %}
+    ({{ predicate.name }} {{ predicate.base_name}})
+    {%- endfor %}
+    {%- endfor %}
+    {%- endfor %}
+)
+
+(:goal (and
+    {%- for task in tasks %}
+    {%- for argument in task.arguments %}
+    (taskStarted {{ argument.name }} {{ task.name }}Instance)
+    {%- endfor %}
+    {%- for step in task.steps %}
+    {%- for field in step.fields %}
+    (hasEnrichedField {{ task.name }}Instance {{ field.name }})
+    {%- endfor %}
+    {%- endfor %}
+    {%- endfor %}
+))
+
+;un-comment the following line if metric is needed
+;(:metric minimize (???))
+)

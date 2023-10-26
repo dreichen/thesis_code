@@ -1,0 +1,91 @@
+from example_data_layers.course_management import *
+
+moduleOneElementOne = ModuleElementEntity({
+    "title" : "Attend Lecture",
+    "done" : False,
+})
+
+moduleOne = ModuleEntity({
+    "num" : 1,
+    "title" : "Introduction",
+    "elements": [moduleOneElementOne],
+    "date" : "22.08.2023",
+    "hideDoneElements" : False
+})
+
+
+assignmentOne = AssignmentEntity({
+    "num" : 1,
+    "title" : "Dealing with squirrels",
+    "question" : "Are squirrels mammals? Justify.",
+    "needsBnf" : False
+})
+
+assignmentTwo = AssignmentEntity({
+    "num" : 2,
+    "title" : "Dealing with whales",
+    "question" : "Are whales mammals? Justify.",
+    "needsBnf" : False
+})
+
+hw = HomeworkEntity({
+    "num" : 5,
+    "title" : "test",
+    "assignments": [assignmentOne, assignmentTwo],
+    "start" : "01.08.2023 07:30:00",
+    "deadline" : "04.08.2024 23:30:00"
+})
+
+moduleTwoElementOne = ModuleElementEntity({
+    "title" : "Attend Lecture",
+    "done" : False,
+    "additionalInfoUrls": ["https://mystery.cs.lth.se/q/edap05-2021-01-q/"]
+})
+
+moduleTwo = ModuleEntity({
+    "num" : 2,
+    "title" : "Background",
+    "elements": [moduleOneElementOne],
+    "date" : "29.08.2023",
+    "hideDoneElements" : False,
+    "homework": hw
+})
+
+group = GroupEntity({
+    "name": "Group 1"
+})
+
+submissionTask = HomeworkSubmissionTaskTask(hw, group)
+submissionTask.step_submitTextAnswer(assignmentOne, {
+    "answer": "Yes, squirrels are mammals because they produce milk to feed their young, have a neocortex in the brain and three middle ear bones as well as fur."
+})
+
+submissionTask.step_submitTextAnswer(assignmentTwo, {
+    "answer": "Yes, whales are mammals. Although they do not have fur, they can be seen as mammals. They produce milk to feed their young, have a neocortex in the brain and three middle ear bones. "
+})
+print(submissionTask.get("answer", assignmentOne))
+print(submissionTask.get("answer", assignmentTwo))
+
+submissionTask.step_submitTextAnswer(assignmentOne, {
+    "answer": "Answer for assignment one is overwritten"
+})
+
+try:
+    print("Expecting Exception since assignmentOne does not allow to attach a code file")
+    submissionTask.step_attachCodeFile(assignmentOne, {
+        "attachedFile": "somefile.txt"
+    })
+except PreconditionNotMetException:
+    print("PreconditionNotMetException thrown as expected")
+
+print(submissionTask.get("answer", assignmentOne))
+print(submissionTask.get("answer", assignmentTwo))
+
+gradingTask = HomeworkGradingTask(hw)
+gradingTask.step_gradeAssignment(assignmentOne, {
+    "grade": 1.3
+})
+
+gradingTask.step_gradeHomework({})
+
+print(gradingTask.get('totalGrade'))

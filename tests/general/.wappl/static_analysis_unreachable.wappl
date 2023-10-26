@@ -1,0 +1,39 @@
+entity A = {
+  one : integer
+  two -> B
+  three -> C
+}
+
+entity B = {
+  name : Text
+  age : integer
+  c -> C
+}
+
+entity C = {
+  amount : integer
+}
+
+task UnreachableExample(a -> A) = {
+  final step unreachable(b -> B) = {
+    precondition: {
+      b.age >= 18
+      self.unreachable == 'something'
+    }
+
+
+    fields: {
+      r  : integer
+    }
+  }
+
+  step firstA(b -> B) = {
+    precondition: {
+      b.age == 4
+    }
+
+    fields: {
+      sth -> C
+    }
+  }
+}

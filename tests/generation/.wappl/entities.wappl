@@ -1,0 +1,20 @@
+type Dollar string = {
+}
+
+type Grade decimal = {
+    fixed(2, 2)
+    positive
+}
+
+entity Homework = {
+    title : Text
+    totalGrade : Grade?
+    assignments -> Assignment*
+}
+
+entity Assignment = {
+    num : integer
+    title : Text
+    question : Text
+    homework  <- Homework
+}

@@ -1,0 +1,88 @@
+(define (domain {{ domain_name }}_gen)
+
+;remove requirements that are not needed
+(:requirements {{ requirements }})
+
+(:types
+    ; base types
+    Entity BuiltinType CustomType - Type
+    Task Step - Executable
+    {% for builtin_type in builtin_types %}{{ builtin_type[0] }} {% endfor %}Decimal - BuiltinType
+    {% for type in types -%}
+        {{ type.name }} - {{ type.parent_type.capitalize() }}
+    {% endfor %}
+    {%- if entities | length  > 0 %}{% for entity in entities %}{{ entity.name }} {% endfor %}- Entity {% endif %}
+    {% if tasks | length > 0 %}{% for task in tasks %}{{ task.name }} {% endfor %}- Task {% endif %}
+)
+
+(:constants
+{%- for task in tasks %}
+{%- for step in task.steps %}
+    {{ step.name }} - Step
+{%- endfor %}
+{%- endfor %}
+)
+
+(:predicates
+    ; base predicates
+    (fieldOf ?s - Step ?t - Type)
+    (taskStarted ?e - Entity ?t - Task)
+    (hasEnrichedField ?t - Task ?field - Type)
+    (stepOf ?t - Task ?s - Step) 
+    (entityArgOf ?ex - Executable ?e - Entity)
+    (stepTaken ?t - Task ?s - Step)
+    (taskInFinalStep ?t - Task ?s - Step)
+    ; specific predicateds -> generated
+    {%- for task in tasks %}
+    {%- for step in task.steps %}
+    {%- for predicate in step.pddl_predicates %}
+    ({{ predicate.name }} ?{{ predicate.base_name}} - {{ predicate.base_type}})
+    {%- endfor %}
+    {%- endfor %}
+    {%- endfor %}
+)
+
+{% for task in tasks %}
+(:durative-action {{ task.name }}Start
+    :parameters ({%- for argument in task.arguments %}?{{ argument.name }} - {{ argument.entity.name }} {%- endfor %} ?task - {{ task.name }})
+    :duration (= ?duration 1)
+    :condition (and
+        (at start(not (taskStarted {% for argument in task.arguments %}?{{ argument.name }}{%- endfor %} ?task)))
+    )
+    :effect (and
+        (at end (taskStarted {% for argument in task.arguments %}?{{ argument.name }}{%- endfor %} ?task))
+    )
+)
+{% for step in task.steps %}
+(:durative-action {{ task.name }}{{ step.name }}
+    :parameters ({%- for argument in step.arguments %}?{{ argument.name }} - {{ argument.entity.name }}{%- endfor %} {%- for argument in task.arguments %} ?{{ argument.name }} - {{ argument.entity.name }}{%- endfor %} ?task - {{ task.name }} ?s - Step {%- for field in step.fields %} ?{{ field.name }} - Type{%- endfor %} {%- for property in step.computed_properties %} ?{{ property.name }} - Type{%- endfor %})
+    :duration (= ?duration 3)
+    :condition (and
+        (at start(taskStarted {% for argument in task.arguments %}?{{ argument.name }}{% endfor %} ?task))
+        {%- for field in step.fields %}
+        (at start(fieldOf ?s ?{{ field.name }}))
+        {%- endfor %}
+        {%- for argument in step.arguments %}
+        (at start(entityArgOf ?s ?{{ argument.name }}))
+        {%- endfor %}
+        (at start(stepOf ?task ?s))
+        (at start (= {{ step.name }} ?s))
+        ; field predicates
+        {%- for predicate in step.pddl_predicates %}
+        (at start ({{ predicate.name }} ?{{ predicate.base_name}}))
+        {%- endfor %}
+        
+    )
+    :effect (and
+        {%- for field in step.fields %}
+        (at end (hasEnrichedField ?task ?{{ field.name }}))
+        {%- endfor %}
+        {%- for property in step.computed_properties %}
+        (at end (hasEnrichedField ?task ?{{ property.name }}))
+        {%- endfor %}
+        
+    )
+)
+{% endfor %}
+{% endfor %}
+)

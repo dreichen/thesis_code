@@ -1,0 +1,37 @@
+import cmd
+
+class PythonCLIInteractionLayer(cmd.Cmd):
+    intro = '''
+            Welcome to the CLI Interface to control the generated application code for "{{ application.name }}".
+            To list all available commands type '?' or 'help'.
+            To exit press 'CTRL+D' or use the exit command.
+            '''
+    prompt = ">>>"
+
+    def do_EOF(self, line):
+        "Press CTRL+D to exit"
+        return True
+    
+    def do_create(self, arg):
+        args = arg.split(" ")
+        choices = [
+            "entity",
+            "task",
+            "user"
+        ]
+
+        if len(args) <= 1:
+            print(f"usage: create <type> <name>")
+
+        if not args[0] in choices:
+            print(f"{args[0]} is not a possible choice from {choices}!")
+
+        
+    def parse(self, arg):
+        return tuple(map(int, arg.split()))
+
+    def postloop(self):
+        print("bye!")
+
+if __name__ == '__main__':
+    PythonCLIInteractionLayer().cmdloop()

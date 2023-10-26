@@ -1,0 +1,110 @@
+entity CTScanningDevice = {
+    identifier : string
+}
+
+entity Nurse = {
+    name : Text
+}
+
+entity ChargeNurse = {
+    name : Text
+}
+
+entity Patient = {
+    name : Text
+}
+
+entity Surgeon = {
+    name : Text
+}
+
+
+// Task-Synchronisation based on arguments-tuple and wildcards
+
+task PerioperativeProcess(p -> Patient) = {
+    step admitAtWardStart(n -> Nurse) = {
+        precondition: {
+            PerioperativeProcess(*).find(n, available, false) == false // making sure there is no other process having set the nurse's availability to false
+        }
+
+        computed: {
+            available = false
+            admitWardEndTime = DateTime.now() + DateTime.seconds(1)
+        }
+    }
+
+    step admitAtWardEnd(n -> Nurse) = {
+        precondition: {
+            self.available == false
+            self.admitWardEndTime <= DateTime.now()
+        }
+
+        computed: {
+            available = true
+            admittedAtWard = true
+        }
+    }
+
+    step doDiagnosticTestsStart(n -> Nurse, ct -> CTScanningDevice) = {
+        precondition: {
+            PerioperativeProcess(*).find(n, available, false) == false
+            PerioperativeProcess(*).find(ct, available, false) == false
+        }
+
+        computed: {
+            available = false
+            doDiagnosticTestsEnd = DateTime.now() + DateTime.seconds(1)
+        }
+    }
+
+    step doDiagnosticTestsEnd(n -> Nurse, ct -> CTScanningDevice) = {
+        precondition: {
+            PerioperativeProcess(*).find(n, admittedAtWard, true) == true
+            self.available == false
+        }
+
+        computed: {
+            available = true
+            diagnosticsDone = true
+        }
+    }
+
+    step registerProcedure(cn -> ChargeNurse) = {
+        precondition: {
+            PerioperativeProcess(p).find(*, diagnosticsDone, true) == true
+            PerioperativeProcess(*).find(cn, available, false) == false
+        }
+
+        computed: {
+            procedureRegistered = true
+        }
+    }
+
+    step startSurgery(s -> Surgeon, n -> Nurse, nn -> Nurse) = {
+        precondition: {
+            PerioperativeProcess(p).find(*, procedureRegistered, true) == true // necessary, because information is bound to argument tuple and procedureRegistered is set for ChargeNurse only
+            PerioperativeProcess(*).find(s, available, false) == false
+            PerioperativeProcess(*).find(n, available, false) == false
+            PerioperativeProcess(*).find(nn, available, false) == false
+        }
+
+        computed: {
+            surgeryActive = true
+            available = false
+            surgeryEnd = DateTime.now() + DateTime.seconds(2)
+        }
+    }
+
+
+    final step endSurgery(s -> Surgeon, n -> Nurse, nn -> Nurse) = {
+        precondition: {
+            self.surgeryActive
+            self.surgeryEnd <= DateTime.now()
+        }
+
+        computed: {
+            surgeryActive = false
+            available = true
+        }
+    }
+}

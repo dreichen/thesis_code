@@ -1,0 +1,39 @@
+#!/bin/python3
+import sys
+from time import sleep
+import os
+os.environ["DEBUSSY"] = "1"
+with open("/home/david/uni/masterthesis/presentation/demo/env.sh", "r") as f:
+    content = f.readlines()
+    a, b = content[0].split(":")
+    os.environ["MAIL_FROM"] = a
+    os.environ["MAIL_PW"] = b[:-1]
+
+header = '''Python 3.8.10 (default, May 26 2023, 14:05:08) 
+[GCC 9.4.0] on linux
+Type "help", "copyright", "credits" or "license" for more information.'''
+print(header)
+with open("/home/david/uni/masterthesis/code/thesis_code/wappl/demo_execution.txt", "r") as f:
+    code = f.readlines()
+    i = 0
+    j = 0
+    for line in code:
+        if line == '\n':
+
+            current = "".join(code[j:i])
+            if current[0] == '\n':
+                current = current[1:]
+            os.system("stty -echo")
+            input(">>> ")
+            os.system("stty echo")
+            for char in current[:-1]:
+                sleep(0.01)
+                sys.stdout.write(char)
+                sys.stdout.flush()
+            inp = input('')
+            try:
+                returnv = exec(current)
+            except Exception as e:
+                print(f"{type(e).__name__}:",e)
+            j = i
+        i += 1

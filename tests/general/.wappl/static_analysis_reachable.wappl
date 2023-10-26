@@ -1,0 +1,61 @@
+entity A = {
+  one : integer
+  two -> B
+  three -> C
+}
+
+entity B = {
+  name : Text
+  age : integer
+  c -> C
+}
+
+entity C = {
+  amount : integer
+}
+
+task ReachableExample(a -> A) = {
+  step second(b -> B) = {
+    precondition: {
+      b.age >= 18
+      self.sth
+    }
+
+
+    fields: {
+      r  : integer
+    }
+  }
+
+  step lastA() = {
+    precondition: {
+      self.r == 5
+    }
+  }
+
+  final step lastB() = {
+    precondition: {
+      self.r == 4
+    }
+  }
+
+  step firstA(a -> A) = {
+    precondition: {
+      a.one == 42
+    }
+
+    fields: {
+      sth -> A
+    }
+  }
+
+  step firstB(b -> B) = {
+    precondition: {
+      b.age == 99
+    }
+
+    fields: {
+      sth -> B
+    }
+  }
+}

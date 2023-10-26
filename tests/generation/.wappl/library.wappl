@@ -1,0 +1,88 @@
+type ISBN string = {
+}
+
+type Name string = {
+}
+
+entity Author = {
+    name : Name
+    books -> Book*
+}
+
+entity Book = {
+    title : Name
+    author <- Author
+    publishedIn : integer
+    isbn : ISBN
+}
+
+entity Student = {
+    user -> User
+    banned : boolean
+}
+
+// BookBorrowing task is executed by a employee of the library
+// The employee can create a new BookBorrowingTask for a Student and the Book the student wants to borrow
+task BookBorrowing(book -> Book) = {
+    step borrow(student -> Student) = {
+        precondition: {
+            BookBorrowing(book).available && !student.banned
+        }
+
+        permissions: {
+            CanLendOut // employee most have role that allows lending out books
+        }
+
+        fields: {
+            deadline : Date // employee can specify the deadline
+        }
+
+        computed: {
+            available = false
+            borrowedAt = Date.now()
+            extended = false
+            book.available = false
+        }
+
+    }
+
+    step extendBorrow(student -> Student) = {
+        precondition: {
+            BookBorrowing(book).deadline >= Date.now()
+            !BookBorrowing(book).extended
+        } 
+
+        fields: {
+            deadline : Date // employee can specify the deadline
+        }
+
+        computed: {
+            extended = true
+        }
+    }
+
+    step bookIsDue(student -> Student) = {
+        precondition: {
+            BookBorrowing(book).deadline >= Date.now()
+
+        }
+
+        computed: {
+            notify(BookIsDue(book), student.user)
+        }
+    }
+
+}
+
+locale en = {
+  BORROWING: {
+    TITLE_DUE: "Borrowing timespan is over"
+    MESSAGE_DUE: "Your borrowed book '{ book.title }'' is due and has to be returned!."
+  }
+}
+
+notification BookIsDue = {
+  title    = Locale.BORROWING.TITLE_DUE
+  message  = Locale.BORROWING.MESSAGE_DUE
+  book -> Book
+}

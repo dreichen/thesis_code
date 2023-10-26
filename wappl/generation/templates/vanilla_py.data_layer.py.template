@@ -1,0 +1,342 @@
+from wappl.language_builtins import *
+from collections import defaultdict
+
+{% for custom_type in custom_types %}
+class {{ custom_type.name }}(CustomType, {{ custom_type.base_type }}):
+    def __init__(self, value):
+        {%- if custom_type.base_type == 'Decimal' %}
+        {{ custom_type.base_type }}.__init__(self)
+        self.value = value
+        {%- else %}
+        {{ custom_type.base_type }}.__init__(self, value)
+        {%- endif %}
+{% endfor %}
+
+class Entity:
+    def __repr__(self):
+        return self.__class__.__name__
+
+# Block of forward declarations for all entities
+{% for entity in entities %}
+class {{ entity.name }}Entity():
+    pass
+{% endfor %}
+
+{% for role in roles %}
+class {{ role.name }}Entity(User):
+    def __init__(self, values={}):
+        self.values = values
+        for key, value in values.items():
+            setattr(self, key, value)
+        self.is_role_entity = True
+{% endfor %}
+
+# Block of forward declarations for all Tasks
+{% for task in tasks %}
+class {{ task.name }}Task():
+    pass
+{% endfor %}
+
+class PythonDataLayer:
+    entity_mapping = {
+        {%- for entity in entities %}
+            "{{ entity.name }}": {{ entity.name }}Entity,
+        {%- endfor %}
+    }
+
+    task_mapping = {
+        {%- for task in tasks %}
+            "{{ task.name }}": {{ task.name }}Task,
+        {%- endfor %}
+    }
+    task_instances = {
+        {%- for task in tasks %}
+            repr({{ task.name }}Task): {},
+        {%- endfor %}
+    }
+
+    @staticmethod
+    def find_instance(task, taskArgs, stepArgs, key, value):
+        for _, instance in PythonDataLayer.task_instances[repr(task)].items():
+            if not "*" in taskArgs and not _ == taskArgs and not _ in taskArgs:
+                continue
+            for k, field in instance.fields.items():
+                if (stepArgs == k or stepArgs in k) and key in field.keys():
+                    if field[key] == value:
+                        return True
+                    else:
+                        return False
+            for k, field in instance.computed.items():
+                if stepArgs == '*' and key in field.keys():
+                    if field[key] == value:
+                        return True
+                    else:
+                        return False
+                elif (stepArgs == k or stepArgs in k) and key in field.keys():
+                    if field[key] == value:
+                        return True
+                    else:
+                        return False
+        return False
+
+    instances = {
+        {%- for entity in entities %}
+            repr({{ entity.name }}Entity): [],
+        {%- endfor %}
+    }
+
+    def get_state(self):
+        state = {
+            "entities": {
+                key: PythonDataLayer.instances[value] for key, value in PythonDataLayer.entity_mapping.items()
+            },
+            "tasks": {
+                key:  PythonDataLayer.instances[value] for key, value in PythonDataLayer.task_mapping.items()
+            }
+        }
+        return state
+
+    def create_entity(self, entity, values):
+        return entity(values)
+    
+    def create_task(self, task, values):
+        return task(values)
+    
+{% for entity in entities %}
+class {{ entity.name }}Entity(Entity):
+    meta_model = {
+        {%- for prop in entity.properties %}
+                "{{ prop.name }}": ({{ prop.type | replace("'", "") }}, "{{ prop.flag }}"),
+        {%- endfor %}
+    }
+
+    observers = defaultdict(list)
+
+    def __init__(self, values):
+        self.is_entity = True
+        # TODO: add exception if field of meta_model is not filled and its not zero or more
+        for name, type_flags_tuple in {{ entity.name }}Entity.meta_model.items():
+            type_, flags = type_flags_tuple
+            if "zeroOrMore" in flags:
+                try:
+                    value = values[name]
+                except Exception as e:
+                    value = [] # default -> empty list
+                if hasattr(value, "is_entity"): # is entity
+                    for v in value:
+                        if v not in PythonDataLayer.instances[repr(type_)]:
+                            raise Exception
+                setattr(self, name, value)
+
+            elif "nullable" in flags:
+                try:
+                    if name in values: # value provided
+                        value = values[name]
+                        if hasattr(value, "is_entity"): # is entity
+                            if value not in PythonDataLayer.instances[repr(type_)]: # value provided -> check that exists
+                                raise Exception
+                            setattr(self, name, value)
+                        else:
+                            value = type_(values[name])
+                            setattr(self, name, value)
+                    else: # no value provided
+                        setattr(self, name, None)
+                except KeyError as ke:
+                    setattr(self, name, None)
+
+            elif hasattr(values[name], "is_entity"):
+                value = values[name]
+                if value not in PythonDataLayer.instances[repr(type_)]:
+                    raise Exception
+                else:
+                    setattr(self, name, value)
+                    
+            elif hasattr(values[name], "is_role_entity"):
+                setattr(self, name, values[name])
+
+            else:
+                value = type_(values[name])
+                setattr(self, name, value)
+
+        PythonDataLayer.instances[repr({{ entity.name }}Entity)].append(self)
+
+    def update_attribute(self, attr_name, attr_value):
+        if attr_name in {{ entity.name }}Entity.meta_model.keys():
+            try:
+                value = {{ entity.name }}Entity.meta_model[attr_name][0](attr_value)
+                setattr(self, attr_name, value)
+                if attr_name in {{ entity.name }}Entity.observers.keys():
+                    for func in {{ entity.name }}Entity.observers[attr_name]:
+                        func()
+
+            except:
+                raise Exception
+
+    def __str__(self):
+        return f"{{ entity.name }}"
+{% endfor %}
+
+
+class PreconditionNotMetException(Exception):
+    def __init__(self, *args: object):
+        super().__init__(*args)
+
+class MissingInputException(Exception):
+    def __init__(self, *args: object):
+        super().__init__(*args)
+
+
+class InsufficientPermissionsException(Exception):
+    def __init__(self, *args: object):
+        super().__init__(*args)
+
+
+{% for task in tasks %}
+class {{ task.name }}Task():
+    meta_model = {
+        "inputs": {
+            "task": {
+                {%- for argument in task.arguments %}
+                    "{{ argument.name }}": {{ argument.entity.name }}Entity,
+                {%- endfor %}
+            },
+            "steps": {
+                {%- for step in task.steps %}
+                    "{{ step.name }}": {
+                        {%- for argument in step.arguments %}
+                            "{{ argument.name }}": {{ argument.entity.name }}Entity,
+                        {%- endfor %}
+                    },
+                {%- endfor %}
+
+            }
+        },
+        "additional_fields": {
+            {%- for step in task.steps %}
+                "{{ step.name }}": {
+                    {%- for field in step.fields %}
+                        "{{ field.name }}": {{ field.type_name }},
+                    {%- endfor %}
+                },
+            {%- endfor %}
+        },
+    }
+
+    def __init__(self, {%- for arg in task.arguments %} {{ arg.name }}, {%- endfor %} user=User()):
+{%- for arg in task.arguments %}
+        if not type({{ arg.name }}) == {{ task.name }}Task.meta_model["inputs"]["task"]["{{ arg.name }}"]:
+            raise TypeError({{ arg.name }})
+        
+        self.{{arg.name}} = {{ arg.name }}
+{%- endfor %}
+
+        self.fields = defaultdict(lambda: defaultdict(bool))
+        self.computed = defaultdict(lambda: defaultdict(bool))
+
+        self.final_steps = []
+        self.final = False
+{%- for step in task.steps %}
+    {%- for prop in step.computedProperties %}
+        {%- for reference in prop.referenced_attributes %}
+        if type({{ reference.iterable }}) == list:
+            type({{ reference.iterable }}[0]).observers["{{ reference.field }}"].append(self.compute_{{ prop.name }}__{{step.name}})
+        else:
+            type({{ reference.iterable }}).observers["{{ reference.field }}"].append(self.compute_{{ prop.name }}__{{step.name}})
+        {%- endfor %}
+    {%- endfor %}
+{%- endfor %}
+        permissions = [
+            {%- for permission_ref in task.permissions %}
+                {%- for permission in permission_ref.permissions %}
+                    "{{ permission.name }}",
+                {%- endfor %}
+            {%- endfor %}
+        ]
+
+        if not user.has_permissions(permissions):
+            raise InsufficientPermissionsException(user, permissions)
+
+        self.steps = [
+            {%- for step in task.steps %}
+                self.step_{{ step.name }},
+            {%- endfor %}
+        ]
+        arguments_tuple = ({%- for argument in task.arguments %}{{argument.name}},{%- endfor%})
+        if arguments_tuple in PythonDataLayer.task_instances[repr({{ task.name }}Task)].keys():
+            raise Exception(f"There already is a Task of type {{ task.name }}Task for arguments {arguments_tuple}")
+        else: 
+            PythonDataLayer.task_instances[repr({{ task.name }}Task)][arguments_tuple] = self
+
+    def get(self, key, *args):
+        a = tuple(arg for arg in args)
+        if a in self.fields.keys() and key in self.fields[a].keys():
+            return self.fields[a][key]
+        return self.computed[a][key]
+        
+    {% for step in task.steps %}
+    def step_{{ step.name }}(self, {% for argument in step.arguments %}{{ argument.name }},{% endfor %} fields, user=User()):
+        if self.final:
+            raise TaskIsLockedException(self.final_steps)
+        permissions = [
+            {%- for permission in step.permissions %}
+                {%- for permission in permission.permissions %}
+                    "{{ permission }}",
+                {%- endfor %}
+            {%- endfor %}
+        ]
+
+{%- for arg in task.arguments %}
+        {{arg.name}} = self.{{ arg.name }}
+{%- endfor %}
+        
+        {% if step.precondition %}
+        if not ({{ step.precondition.python_code_enriched }}):
+            raise PreconditionNotMetException('precondition \"{{ step.precondition.python_code|replace(".get('", ".")|replace("', <step_args>)", "") }}\" not met')
+        {% endif %}
+        if not user.has_permissions(permissions):
+            raise InsufficientPermissionsException(user, permissions)
+
+        # TODO: check if field types match and all required fields were added
+
+        for field_name, field_type in {{ task.name }}Task.meta_model["additional_fields"]["{{ step.name }}"].items():
+            if type(fields[field_name]) == list:
+                try:
+                    field_values = list(map(lambda x : x, fields[field_name]))
+                except KeyError as e:
+                    raise Exception(f"You have to specify {field_name} of type list({field_type})")
+                except Exception as e:
+                    raise Exception(f"field type {type(fields[field_name])} does not match the required type list({field_type})")
+                if field_name in self.fields[()].keys():
+                    self.fields[({% for argument in step.arguments %}{{ argument.name }},{% endfor %})][field_name].append(*field_values)
+                else:
+                    self.fields[({% for argument in step.arguments %}{{ argument.name }},{% endfor %})][field_name] = field_values
+            else:
+                try:
+                    field_value = field_type(fields[field_name])
+                except KeyError as e:
+                    raise Exception(f"You have to specify field {field_name} of type {field_type}")
+                except Exception as e:
+                    raise Exception(f"field type {type(fields[field_name])} does not match the required type {field_type}")
+                self.fields[({% for argument in step.arguments %}{{ argument.name }},{% endfor %})][field_name] = field_value
+
+        {% for prop in step.computedProperties %}
+        self.compute_{{ prop.name }}__{{step.name}}({% for argument in step.arguments %}{{ argument.name }},{% endfor %})
+        {% endfor %}
+
+        {%- for effect in step.effects %}
+        {{ effect.jinja_context }}
+        {%- endfor %}
+        
+        {%- if step.final %}
+        self.final = True
+        self.final_steps.append("{{ step.name }}")
+        {%- endif %}
+    {% for prop in step.computedProperties %}
+    def compute_{{ prop.name }}__{{step.name}}(self{% for argument in step.arguments %}, {{ argument.name }}{% endfor %}):
+        {%- for arg in task.arguments %}
+        {{arg.name}} = self.{{ arg.name }}
+        {%- endfor %}
+        self.computed[({% for argument in step.arguments %}{{ argument.name }},{% endfor %})]["{{ prop.name }}"] = {{ prop.expression.python_code_enriched }}
+    {% endfor %}
+    {% endfor %}
+{% endfor %}

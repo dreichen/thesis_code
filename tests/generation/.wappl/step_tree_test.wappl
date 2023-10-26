@@ -1,0 +1,75 @@
+type Age integer = {
+}
+
+entity Person = {
+    name : Text
+    age : Age
+}
+
+entity Marriage = {
+    partnerA -> Person
+    partnerB -> Person
+}
+
+entity House = {
+  address : Address
+}
+
+role CoreUser = {
+  permissions: {
+    A
+    B
+    C
+  }
+}
+
+task Marrying(a -> Person) = {
+  step proposeTo(b -> Person) = {
+    precondition: {
+      a.age >= 18
+      b.age >= 18
+    }
+
+    permissions: {
+      A
+    }
+
+    fields: {
+      proposed  : integer
+    }
+  }
+
+  step marry(b -> Person) = {
+    precondition: {
+      self.proposed == 2
+    }
+
+    fields: {
+      marriage -> Marriage
+    }
+  }
+
+  step buildHouse(m -> Marriage) = {
+    fields: {
+      house -> House
+    }
+  }
+
+  step otherStep(m -> Marriage) = {
+    precondition: {
+      self.house
+    }
+    fields: {
+      other -> Person
+    }
+  }
+
+  final step becomeParents(m -> Marriage) = {
+    precondition: {
+      self.house
+    }
+    fields: {
+      child -> Person
+    }
+  }
+}

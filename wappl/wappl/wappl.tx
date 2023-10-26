@@ -1,0 +1,150 @@
+import types
+
+// Web Application Process Planning Language
+WapplModel:
+     (types*=Type)?
+     (entities*=Entity)?
+     (roles*=Role)?
+     (tasks*=Task)?
+;
+
+Task:
+    'task' name=ID '(' arguments*=TaskArgument ')' '= {'
+        (precondition=Precondition)?
+        (permissions*=PermissionReference)?
+        steps+=Step
+    '}'
+;
+
+Precondition:
+    'precondition:' '{'
+        expressions+=Expression
+    '}'
+;
+
+Step:
+    final?='final' 'step' name=ID '(' arguments*=TaskArgument ')' '= {'
+        (precondition=Precondition)?
+        (permissions*=PermissionReference)?
+        ('fields: {' fields*=EntityProperty '}')?
+        ('computed: {' computedProperties*=ComputedProperty '}')?
+        ('effects: {' effects*=EffectDefinition '}')?
+    '}'
+;
+
+EffectDefinition:
+    MailEffect
+;
+
+MailEffect:
+    'mail' '(' 'to' '=' to=Primary ',' 'body' '=' body=STRING (',' 'subject' '=' subject=STRING)? ')'
+;
+
+ComputedProperty:
+    name=ID '=' expression=Expression
+;
+
+PermissionReference:
+    'permissions: {' permissions+=[Permission]'}'
+;
+
+Permission:
+    ID
+;
+
+TaskArgument:
+   EntityReference "," | EntityReference 
+;
+
+Role:
+    'role' name=ID '= {'
+        'permissions: {' permissions*=Permission '}'
+    '}'
+;
+
+Entity:
+    'entity' name=ID '= {'
+        properties*=EntityProperty
+    '}'     
+;
+
+EntityProperty:
+    BuiltinTypeReference | TypeReference | EntityReference | EntityReverseReference
+;
+
+EntityReference:
+    name=ID '->' (entity=[Entity] | entity=[Role]) (zeroOrMore?='*' | oneOrMore?='+' | nullable?='?')?
+;
+
+EntityReverseReference:
+    name=ID '<-' entity=[Entity]
+;
+
+Expression: 
+    condition=Disjunction '?' if=Disjunction ':' else=Expression
+    | dis=Disjunction
+;
+
+Disjunction: 
+    op=Conjunction ('||' op=Conjunction)*
+;
+
+Conjunction: 
+    op=Inversion ('&&' op=Inversion)*
+;
+
+Inversion: 
+    not?='!' op=Comparison
+;
+
+Comparison:
+    op=Sum sign='==' op=Sum
+    | op=Sum sign='!=' op=Sum
+    | op=Sum sign='>=' op=Sum
+    | op=Sum sign='>'  op=Sum
+    | op=Sum sign='<=' op=Sum
+    | op=Sum sign='<'  op=Sum
+    | op=Sum
+;
+
+Sum:
+    op=Term ((sign='+' op=Term) | (sign='-' op=Term))*
+;
+
+Term:
+    op=Factor ((operation='*' op=Factor) | (operation='/' op=Factor) | (operation='//' op=Factor) | (operation='%' op=Factor ))*
+;
+
+Factor:
+    op=Power ((operation='+' op=Factor) | (operation='-' op=Factor))* | '(' expression=Expression ')'
+;
+
+Power:
+    op=Primary '^' factor=Factor 
+    | op=Primary
+;
+
+Primary:
+    func=BuiltinFunctionCall |
+    number=NUMBER | boolean=BOOL | string=STRING | id=ID ('.' id=ID)*
+;
+
+BuiltinFunctionCall:
+    (name='count' | name='mean' | name='sum' | name='max' | name='min' | name='minEntity' | name='maxEntity' | name='median') '(' iterable=Primary (','field=Primary)? ')' 
+    | argumentSyncExpr=ArgumentSync
+    | dateFunction=DatFunctionCall
+;
+
+DatFunctionCall:
+    (name='Date' | name='DateTime') '.' (functionName='now') '('')' |
+    (name='Date' | name='DateTime') '.' (functionName='days' | functionName='hours' | functionName='miuntes' | functionName='seconds') '(' arg=NUMBER ')' 
+;
+
+ArgumentSync:
+    task=[Task] '(' (wildcard?='*' | arguments*=[TaskArgument] ) ').find(' ((stepWildcard?='*') | stepArg=[TaskArgument]) ',' fieldName=ID ',' expression=Expression ')'
+;
+
+
+Comment:
+    /\/\/.*$/ | /\/\*(.|\n)*?\*\// 
+;

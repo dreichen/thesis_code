@@ -1,0 +1,53 @@
+Expression: 
+    condition=Disjunction '?' if=Disjunction ':' else=Expression
+    | dis=Disjunction
+;
+
+Disjunction: 
+    op=Conjunction ('||' op=Conjunction)*
+;
+
+Conjunction: 
+    op=Inversion ('&&' op=Inversion)*
+;
+
+Inversion: 
+    not?='!' op=Comparison
+;
+
+Comparison:
+    op=Sum sign='==' op=Sum
+    | op=Sum sign='!=' op=Sum
+    | op=Sum sign='>=' op=Sum
+    | op=Sum sign='>'  op=Sum
+    | op=Sum sign='<=' op=Sum
+    | op=Sum sign='<'  op=Sum
+    | op=Sum
+;
+
+Sum:
+    op=Term ((sign='+' op=Term) | (sign='-' op=Term))*
+;
+
+Term:
+    op=Factor ((operation='*' op=Factor) | (operation='/' op=Factor) | (operation='//' op=Factor) | (operation='%' op=Factor ))*
+;
+
+Factor:
+    op=Power ((operation='+' op=Factor) | (operation='-' op=Factor))* | '(' expression=Expression ')'
+;
+
+Power:
+    op=Primary '^' factor=Factor 
+    | op=Primary
+;
+
+Primary:
+    func=BuiltinFunctionCall |
+    number=NUMBER | boolean=BOOL | string=STRING | id=ID ('.' id=ID)*
+;
+
+BuiltinFunctionCall:
+    (name='count' | name='mean' | name='sum' | name='max' | name='min' | name='minEntity' | name='maxEntity' | name='median') '(' iterable=Primary (','field=Primary)? ')' 
+    | name='Date.now' | name='DateTime.now'
+;

@@ -1,0 +1,133 @@
+type Money decimal = {
+    fixed(20,2)
+    positive
+}
+
+entity SupplierResponse = {
+    supplier -> Supplier
+    bidAmount : Money?
+    declined : boolean?
+}
+
+entity FixedPriceRequest = {
+    information : Text
+    deadline : DateTime
+}
+
+role Requester = {
+    permissions: {
+        EditRequest
+        SubmitRequest
+    }
+}
+
+role Buyer = {
+    permissions: {
+        Buy
+    }
+}
+
+role Supplier = {
+    permissions: {
+        Bid
+    }
+}
+
+role Reviewer = {
+    permissions: {
+        DoReview
+    }
+}
+
+task FixedPriceRequestTask(request -> FixedPriceRequest) = {
+    step init() = {
+        permissions: {
+            SubmitRequest
+        }
+
+        computed: {
+            initialized = true
+        }
+    }
+
+    step edit() = {
+        precondition: {
+            self.initialized == true
+        }
+
+        permissions: {
+            EditRequest
+        }
+
+        computed: {
+            edited = true
+        }
+    }
+
+    step submitToBuyer() = {
+        permissions: {
+            SubmitRequest
+        }
+
+        computed: {
+            submitted = true
+        }
+    }
+
+    step modifyByBuyer() = {
+        precondition: {
+            self.submitted == true
+        }
+
+        permissions: {
+            Buy
+        }
+
+        fields: {
+            legalDocument : File
+            financialApproval : boolean
+        }
+    }
+
+    step approve() = {
+        precondition: {
+            self.financialApproval == true
+        }
+
+        permissions: {
+            Buy
+        }
+
+        computed: {
+            approved = true
+        }
+    }
+
+    step submitResponse() = {
+        precondition: {
+            self.approved == true
+        }
+
+        permissions: {
+            Bid
+        }
+
+        fields: {
+            supplierResponses -> SupplierResponse*
+        }
+    }
+
+    final step evaluateWinner() = {
+        precondition: {
+            request.deadline < DateTime.now()
+        }
+
+        computed: {
+            winner = minEntity(self.supplierResponses, bidAmount)
+        }
+
+        effects: {
+            mail(to=self.winner.supplier.mail, body='You have won!')
+        }
+    }
+}

@@ -1,0 +1,91 @@
+type Grade decimal = {
+  fixed(1, 2)
+  positive
+}
+
+
+entity Thesis = {
+	title : Text
+	thesisType : Text
+	student -> Student
+}
+
+role Student = {
+	permissions: {
+		SubmitThesis
+	}
+}
+
+role Supervisor = {
+	permissions: {
+		GradeThesis
+		AdmitRegistration
+	}
+}
+
+task ThesisSubmission(thesis -> Thesis) = {
+	step registration() = {
+		computed: {
+			submissionDate = DateTime.now() + DateTime.days(182)
+			registeredAt = DateTime.now()
+		}
+	}
+	
+	step admitRegistration() = {
+		permissions: {
+			AdmitRegistration
+		}
+
+		computed: {
+			admitted = true
+		}
+	}
+
+
+	step givePresentation() = {
+		precondition: {
+			self.admitted
+		}
+		fields: {
+			slideShow : File
+		}
+		computed: {
+			presentationGiven = true
+		}
+	}
+	
+	step submitThesis() = {
+		precondition: {
+			DateTime.now() < self.submissionDate
+			self.admitted
+		}
+
+		fields: {
+			document : File
+		}
+
+		computed: {
+			submittedAt = DateTime.now()
+			submitted = true
+		}
+	}
+	
+	final step gradeThesis() = {
+		precondition: {
+			self.submitted
+			self.presentationGiven
+		}
+
+		permissions: {
+			GradeThesis
+		}
+		
+		fields: {
+			grade : Grade
+		}
+
+        effects: {
+            mail(to=thesis.student.mail, body='Hi, your thesis was graded and published to TUCaN!', subject='Your thesis was graded!')
+        }
+	}
+}

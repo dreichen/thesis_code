@@ -15,5 +15,13 @@ This repository holds the prototype implementation of my Masterthesis to showcas
 ## Execution of tests
 - in root directory: `make` (requires make to be installed)
 
+## Execution of planning experiments
+- `planning_experiments` contains the files for the automated planning capability evaluation
+- use VSCode and PDDL VSCode Extension: https://marketplace.visualstudio.com/items?itemName=jan-dolejsi.pddl
+- start a docker container that runs planutils using `cd planning_experiments && ./run.sh` (might require sudo, depending on your installation of docker)
+- install TFD planner according to planutils documentation (https://github.com/AI-Planning/planutils)
+- open `*_problem.pddl` file of you choice, press ALT+P and run execution against locally running planutils server
+- PDDL extension of VSCode automatically visualizes the plan the planner came up with
+
 ## Metrics
 - the `metrics` directory holds the script used to calculate the token count for the GPL and DSL implementations as mentioned in the thesis' section 7.2
